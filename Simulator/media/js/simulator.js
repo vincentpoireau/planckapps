@@ -132,6 +132,12 @@
 		return;
 	}
 
+	ParameterSlider.prototype.setRandom = function(){
+		var v = this.opts[Math.floor(this.opts.length*Math.random())];
+		this.setValue(parseFloat(v));
+		return;
+	}
+
 	// A class to create and display a power spectrum
 	// inp = {
 	//	ps: 'powerspectrum' // ID of the HTML element for the plot
@@ -146,7 +152,6 @@
 		this.dir = (is(inp.dir,"string")) ? inp.dir : "db/";
 		this.omega = { b: "", c:"", l:"" };
 		this.fullscreen = false;
-		this.logging = (console && typeof console.log==="function");
 		this.fixedscale = (is(inp.fixedscale,"boolean")) ? inp.fixedscale : true;
 
 		// Store the callbacks and a context which will be used for the "this"
@@ -174,6 +179,13 @@
 			ev.data.me.resize();
 		});
 
+		return this;
+	}
+
+	PowerSpectrum.prototype.log = function(){
+		var args = [];
+		for (var i = 0; i < arguments.length; i++) args.push(arguments[i]);
+		if(console && is(console.log,"function")) console.log('LOG',args);
 		return this;
 	}
 
@@ -290,7 +302,7 @@
 
 		// Draw the axes labels
 		this.chart.xLabel = this.chart.holder.text(l + w/2, t + h + b*0.5, "Échelle dans le ciel").attr({fill: (this.opts.xaxis.label.color ? this.opts.xaxis.label.color : "black"),'font-size': this.opts.font,'font-family': this.opts.xaxis.label.font });
-		this.chart.yLabel = this.chart.holder.text(l*0.5, t+(h/2), "Contraste  "+ell+"("+ell+"+1) C"+ell+"").attr({fill: (this.opts.yaxis.label.color ? this.opts.yaxis.label.color : "black"),'font-size': this.opts.font,'font-family': this.opts.yaxis.label.font }).rotate(270);
+		this.chart.yLabel = this.chart.holder.text(l*0.5, t+(h/2), "Contraste "+ell+"("+ell+"+1) C"+ell+"").attr({fill: (this.opts.yaxis.label.color ? this.opts.yaxis.label.color : "black"),'font-size': this.opts.font,'font-family': this.opts.yaxis.label.font }).rotate(270);
 
 		// Draw angular labels on chart
 		if(this.opts.xaxis.ticks){
@@ -345,7 +357,7 @@
 		// Check we have somewhere to draw
 		if(!this.chart.holder) return this;
 
-		if(this.logging) var d = new Date();
+		var d = new Date();
 
 		// Build the power spectrum curve
 		if(this.data){
@@ -371,6 +383,7 @@
 			Yscale = (this.opts.offset.height) / Yrange;
 			this.firsttrough = 0;
 			this.firstpeak = 0;
+			this.firstpeakamp = 0;
 
 			//if(!this.chart.dots) this.chart.dots = this.chart.holder.set();
 
@@ -395,8 +408,11 @@
 						// curves through the peak/troughs.
 						if(data[0][i] > 100 && (trough || peak)){
 
-							// Keep a record of where the first peak is just in case we want it
-							if(peak && !this.firstpeak) this.firstpeak = data[0][i];
+							// Keep a record of where the first peak for later
+							if(peak && !this.firstpeak){
+								this.firstpeak = data[0][i];
+								this.firstpeakamp = data[1][i];
+							}
 
 							// Keep a record of where the first trough is for curve fitting
 							if(trough && this.firstpeak && !this.firsttrough) this.firsttrough = data[0][i];
@@ -422,8 +438,6 @@
 					prevy = y;
 				}
 				if(tempy > max) max = tempy;
-				//if(!this.chart.dots[i]) this.chart.dots.push(this.chart.holder.circle(x, y, 3).attr({fill: "#333"}));
-				//else this.chart.dots[i].animate({cx: x, cy: y},100);
 			}
 
 			// Now we make sure we don't display any parts of the curve that are outside the plot area
@@ -432,8 +446,6 @@
 			this.chart.line = this.chart.holder.path(p).attr({stroke: "#E13F29", "stroke-width": 3, "stroke-linejoin": "round","clip-rect":clip});
 
 		}
-
-		//if(this.logging) console.log("Total for PowerSpectrum.prototype.draw(): " + (new Date() - d) + "ms");
 
 		return this;
 	}
@@ -487,7 +499,7 @@
 			return;
 		}
 
-		if(this.logging) console.log('Getting '+file+' for '+id)
+		this.log('Getting '+file+' for '+id)
 
 		var _obj = this;
 
@@ -495,7 +507,8 @@
 		this.json = "";
 
 		// Bug fix for reading local JSON file in FF3
-		$.ajaxSetup({async:false,'beforeSend': function(xhr){ if (xhr.overrideMimeType) xhr.overrideMimeType("text/plain"); } });
+		// Removed as is deprecated in newer browsers
+		//$.ajaxSetup({async:false,'beforeSend': function(xhr){ if (xhr.overrideMimeType) xhr.overrideMimeType("text/plain"); } });
 
 		// Do the AJAX request for the data file
 		$.ajax({
@@ -510,7 +523,7 @@
 			},
 			error: function(e){
 				this.callback.context.error("Impossible de charger les fluctuations du fond diffus cosmologique pour cet univers (&Omega;<sub>b</sub> = "+b+", &Omega;<sub>c</sub> = "+c+", &Omega;<sub>&Lambda;</sub> = "+l+"). Dommage. :-(");
-				if(this.logging) console.log(file)
+				this.log(file)
 			},
 			timeout: 4000
 		});
@@ -526,8 +539,6 @@
 
 		// If the values haven't changed we don't need to recalculate the data
 		if(b==this.omega.b && c==this.omega.c && l==this.omega.l) return;
-
-		//console.log('getData',id,b,c,l,this.omega_b,this.omega_c,this.omega_l,this.json)
 
 		// Reset the l value for the first peak
 		this.firstpeak = 0;
@@ -768,13 +779,14 @@
 		this.dir = (is(inp.dir,"string")) ? inp.dir : "db/";
 		this.context = (is(inp.context,"object")) ? inp.context : this;
 		this.loaded = false;
-		this.logging = true;
 		this.sluggish = false;
 
 		// Display options
 		this.fixedscale = (is(inp.fixedscale,"boolean")) ? inp.fixedscale : true;
 		this.showours = true;
 		this.showscale = true;
+		//VP
+		this.buttonouruniverse = false;
 
 		this.w = 256,
 		this.h = 256,
@@ -788,6 +800,13 @@
 
 		// Load the 'our universe' image
 		this.our = new Image();
+		this.loadedouruniverse = false;	// Have we loaded the image yet?
+		var _obj = this;
+		// Create a callback function for when we've loaded the image
+		this.our.onload = function(e){
+			_obj.loadedouruniverse = true;
+			_obj.load();
+		};
 		this.our.src = this.el.find('img.our').attr('src');
 
 		// Set up the class to deal with the <canvas>
@@ -805,28 +824,37 @@
 		this.spectrum.ctx.fillRect(0, 0, this.w, this.h);
 
 		// Add the labels
-		this.el.append('<div class="label sim">Univers créé</div><div class="label our">Notre  Univers</div><div class="label scale"><div class="value">1&deg;</div></div>');
+		this.el.append('<div class="label sim">Votre univers simulé</div><div class="label our">Notre Univers</div><div class="label scale"><div class="value">1&deg;</div></div>');
 
 		FFT.init(this.w);
 		FrequencyFilter.init(this.w, this.dl);
 		SpectrumViewer.init(this.spectrum.ctx);
 
 		// Add a callback for when it is loaded
-		this.load();
+		return this.load();
+	}
+
+	Sky.prototype.log = function(){
+		var args = [];
+		for (var i = 0; i < arguments.length; i++) args.push(arguments[i]);
+		if(console && is(console.log,"function")) console.log('LOG',args);
+		return this;
 	}
 
 	// Called when the image has been loaded
 	Sky.prototype.load = function(){
-		this.loaded = true;
-		this.setupFFT();
-		this.update();
-		this.resize();
+		if(this.loadedouruniverse){
+			this.loaded = true;
+			this.setupFFT();
+			this.update();
+			this.resize();
+		}
 		return this;
 	}
 
 	Sky.prototype.setupFFT = function(){
 
-		if(this.logging) var d = new Date();
+		var d = new Date();
 
 		// Read the blank image data into a blob
 		this.src = this.spectrum.ctx.getImageData(0, 0, this.w, this.h);
@@ -852,7 +880,7 @@
 		this.setColourTable('planck');
 
 		if(new Date() - d > 1000) this.sluggish = true;
-		if(this.logging) console.log("Total for Sky.prototype.setupFFT(): " + (new Date() - d) + "ms");
+		this.log("Total for Sky.prototype.setupFFT(): " + (new Date() - d) + "ms");
 
 		if(this.sluggish) this.context.warning('Cela peut prendre du temps pour mettre à jour cet univers. Patience.');
 		else $('#warning').hide();
@@ -960,10 +988,10 @@
 			}
 
 		} catch(e) {
-			if(this.logging) console.log(e,p,val,re[i + x],i,x);
+			this.log('update() fail');
 		}
 
-		if(this.logging) console.log("Total for Sky.prototype.update():" + (new Date() - d) + "ms");
+		this.log("Total for Sky.prototype.update():" + (new Date() - d) + "ms");
 	}
 
 
@@ -1360,7 +1388,7 @@
 		var _obj = this;
 
 		// Set up the three Omega sliders
-		this.omega_b = new ParameterSlider({
+        this.omega_b = new ParameterSlider({
 			select: $("#"+((inp.omega_b && typeof inp.omega_b==="string") ? inp.omega_b : "omega_b")),
 			context: _obj,
 			change: change,
@@ -1387,7 +1415,7 @@
 		inp.omega_l = this.omega_l.value;
 
 		// Keep a copy of the starting values
-		this.our = { omega_b: 0.050, omega_c: 0.275, omega_l: 0.675 };
+		this.our = { omega_b: 0.050, omega_c: 0.275, omega_l: 0.675, firstpeak: 220,firstpeakamp: 5291.5 };
 
 		// Hide the About section if we aren't at that anchor
 		if(location.hash.substring(1) != "about"){
@@ -1414,8 +1442,17 @@
 		// Make an instance of a view of part of the sky
 		this.sky = new Sky(inp);
 
+
 		// Make option buttons
 		$('#options').append(
+			$('<a class="button matteronly" href="#">Matière normale seule</a>').on('click',{me:this},function(e){
+				e.preventDefault();
+				var sim = e.data.me;
+				//sim.omega_b.setValue(0.20);
+				sim.omega_c.setValue(0.00);
+				sim.omega_l.setValue(0.00);
+				sim.ps.loadData('omega_b',sim.omega_b.value,sim.omega_c.value,sim.omega_l.value);
+			}),
 			$('<a class="button ouruniverse" href="#">Notre Univers</a>').on('click',{me:this},function(e){
 				e.preventDefault();
 				var sim = e.data.me;
@@ -1423,14 +1460,7 @@
 				sim.omega_c.setValue(sim.our.omega_c);
 				sim.omega_l.setValue(sim.our.omega_l);
 				sim.ps.loadData('omega_b',sim.omega_b.value,sim.omega_c.value,sim.omega_l.value);
-			}),
-			$('<a class="button matteronly" href="#">Matière normale seule</a>').on('click',{me:this},function(e){
-				e.preventDefault();
-				var sim = e.data.me;
-				sim.omega_b.setValue(0.20);
-				sim.omega_c.setValue(0.00);
-				sim.omega_l.setValue(0.00);
-				sim.ps.loadData('omega_b',sim.omega_b.value,sim.omega_c.value,sim.omega_l.value);
+/*
 			}),
 			$('<a class="button flatten" href="#">Aplatir</a>').on('click',{me:this},function(e){
 				e.preventDefault();
@@ -1456,11 +1486,12 @@
 					}else sim.omega_c.setValue(1-ob);
 				}
 				sim.ps.loadData('omega_b',sim.omega_b.value,sim.omega_c.value,sim.omega_l.value);
+				*/
 			})
 		);
 
 		// Set up the configuration form
-		$('#config form').append('<div class="configoption"><input type="checkbox" name="showscale" /><label for="showscale">Montrer les échelles angulaires</label></a></div><div class="configoption"><input type="checkbox" name="showours" /><label for="showours">Montrer notre Univers</label></a></div><div class="configoption"><input type="checkbox" name="normscale" /><label for="normscale">Normaliser l\'échelle</label></div><!--<div class="configoption"><label for="colourtable">Code de couleur</label>: <select name="colourtable" id="colourtable"><option value="planck">Planck</option><option value="blackbody">Heat</option><option value="A">A</option><option value="B">B</option></select></div>-->');
+		$('#config form').append('<!--<div class="configoption"><input type="checkbox" name="showscale" /><label for="showscale">Montrer les échelles angulaires</label></a></div><div class="configoption"><input type="checkbox" name="showours" /><label for="showours">Montrer notre Univers</label></a></div><div class="configoption">--><div class="configoption"><input type="checkbox" name="normscale" /><label for="normscale">Normaliser l\'échelle du graphe</label></div><input type="checkbox" name="buttonouruniverse" /><label for="buttonouruniverse">Bouton \"Notre Univers\"</label></div><!--<div class="configoption"><label for="colourtable">Code de couleur</label>: <select name="colourtable" id="colourtable"><option value="planck">Planck</option><option value="blackbody">Heat</option><option value="A">A</option><option value="B">B</option></select></div>-->');
 		$('#config form input[name=showscale]').attr('checked',this.sky.showscale).on('click',{me:this},function(e){
 			var sim = e.data.me;
 			sim.sky.showscale = $(this).is(':checked');
@@ -1470,6 +1501,13 @@
 		$('#config form input[name=showours]').attr('checked',this.sky.showours).on('click',{me:this},function(e){
 			var sim = e.data.me;
 			sim.sky.showours = $(this).is(':checked');
+			sim.sky.update();
+			sim.update();
+		});
+		//VP
+		$('#config form input[name=buttonouruniverse]').attr('checked',this.sky.buttonouruniverse).on('click',{me:this},function(e){
+			var sim = e.data.me;
+			sim.sky.buttonouruniverse = $(this).is(':checked');
 			sim.sky.update();
 			sim.update();
 		});
@@ -1536,7 +1574,7 @@
 			if(location.hash.substring(1)!="about" && $('#help').hasClass('on')) toggleAbout();
 		},500);
 
-		var newdiv = $('<div id="menu"><div id="help" class="toggle"><a href="#about" class="abouton">i</a><a href="#" class="aboutoff">&#8679;</a></div><div id="advancedtoggle" class="toggle"><a href="#powerspectrum"><img src="media/img/cleardot.gif" alt="Plot" title="Montrer le graphe" /></a></div><div id="configtoggle" class="toggle"><a href="#config"><img src="media/img/cleardot.gif" alt="Options" title="Montrer les options" /></a></div></div>');
+		var newdiv = $('<div id="menu"><div id="help" class="toggle"><a href="#about" class="abouton">i</a><a href="#" class="aboutoff">&#8679;</a></div><div id="advancedtoggle" class="toggle"><a href="#powerspectrum"><img src="media/img/cleardot.gif" alt="Plot" title="Montrer le graphe" /></a></div><div id="configtoggle" class="toggle"><a href="#config"><img src="media/img/cleardot.gif" alt="Options" title="Montrer les options" /></a></div><div id="refreshtoggle" class="toggle"><a href="#"><img src="media/img/cleardot.gif" alt="Plot" title="Rafraîchir la page" /></a></div></div>');
 		$('h1').before(newdiv);
 		$('#help .abouton a, #help .aboutoff a').on('click',toggleAbout);
 		$('#advancedtoggle a').on('click',{me:this},function(e){
@@ -1547,7 +1585,13 @@
 		$('#configtoggle').on('click',{me:this},function(e){
 			lightbox($('#config'),$('#configtoggle'));
 		});
-
+        $('#refreshtoggle').on('click',{me:this},function(e){
+            var sim=e.data.me;
+            sim.omega_b.setRandom();
+            sim.omega_c.setRandom();
+    		sim.omega_l.setRandom();
+    		sim.ps.loadData('omega_b',sim.omega_b.value,sim.omega_c.value,sim.omega_l.value);
+		});
 
 		// Update labels, buttons etc
 		this.update();
@@ -1568,10 +1612,17 @@
 			this.ps.resize();
 		}
 
+		// Set the Omega values to random options
+		this.omega_b.setRandom();
+		this.omega_c.setRandom();
+		this.omega_l.setRandom();
+		this.ps.loadData('omega_b',this.omega_b.value,this.omega_c.value,this.omega_l.value);
+
+
 		return this;
 	}
 
-
+	// If the browser changes dimensions
 	Simulator.prototype.resize = function(){
 		this.ps.resize();
 		this.sky.resize();
@@ -1579,6 +1630,7 @@
 		return this;
 	}
 
+	// Update
 	Simulator.prototype.update = function(e){
 
 		if($('#map') && this.sky){
@@ -1594,6 +1646,10 @@
 			else $('.label.our').hide();
 		}
 
+//VP
+		if(this.sky.buttonouruniverse) $('.button.ouruniverse').show();
+		else $('.button.ouruniverse').hide();
+
 		if(this.previous.omega_b == this.omega_b.value && this.previous.omega_c == this.omega_c.value && this.previous.omega_l == this.omega_l.value) return this;
 		else this.previous = { omega_b: this.omega_b.value, omega_c: this.omega_c.value, omega_l: this.omega_l.value };
 
@@ -1606,14 +1662,26 @@
 		if($('#firstpeak')){
 			// Display the first peak along with the roughly equivalent angular size
 			var ang = 180/this.ps.firstpeak;
-			if(this.ps.firstpeak > 0) $('#firstpeak').html('Premier pic à <span class="property">&#8467; = '+this.ps.firstpeak+'</span> (~'+(ang > 0.5 ? ang.toFixed(1) : ang.toFixed(2))+'&deg;)');
+
+			// Construct a message about the location/amplitude of the first peak in the power spectrum
+			var goldilocks = "";
+			if(this.ps.firstpeak > this.our.firstpeak) goldilocks += "trop petit";
+			if(this.ps.firstpeak < this.our.firstpeak) goldilocks += "trop grand";
+			if(this.ps.firstpeakamp > this.our.firstpeakamp) goldilocks += (goldilocks ? " et " : "")+"trop lumineux";
+			if(this.ps.firstpeakamp < this.our.firstpeakamp) goldilocks += (goldilocks ? " et " : "")+"trop peu lumineux";
+
+			if(this.ps.firstpeak > 0) $('#firstpeak').html('Échelle fondamentale <span class="advanced">à <span class="property">&#8467; = '+this.ps.firstpeak+'</span></span> <span class="advanced">(</span>~'+(ang > 0.5 ? ang.toFixed(1) : ang.toFixed(2))+'&deg;<span class="advanced">)</span>'+(goldilocks ? ' - '+goldilocks : ''));
 			else $('#firstpeak').html('Pas de fluctuations dans le fond diffus cosmologique'+(this.omega_b.value == 0 ? ' <br />car il n\'y a pas de matière pour interagir avec les photons.' : ''));
 		}else{
 			$('#firstpeak').html('?');
 		}
 		if($('#age')){
 			this.cosmos.compute(this.omega_b.value, this.omega_c.value, this.omega_l.value);
-			$('#age').html('<span class="age property">'+this.cosmos.age_Gyr.toFixed(1)+'</span> milliards d\'années');
+			var goldilocks = "parfait";
+			var age = parseFloat(this.cosmos.age_Gyr.toFixed(1));
+			if(age > 13.8) goldilocks = "trop vieux";
+			if(age < 13.8) goldilocks = "trop jeune";
+			$('#age').html('<span class="age property">'+age+'</span> milliards d\'années - '+goldilocks);
 		}
 		if($('#curvature')){
 			var tot = this.omega_b.value + this.omega_c.value + this.omega_l.value;
@@ -1621,14 +1689,39 @@
 			if(tot == 1) $('.button.flatten').hide();
 			else $('.button.flatten').show();
 		}
+		if($('#similarity')){
+			var sim = this.similarity([this.omega_b.value,this.omega_c.value,this.omega_l.value],[this.our.omega_b,this.our.omega_c,this.our.omega_l]);
+			var txt = "très différent de notre Univers";
+			if(sim > 0.60) txt = "assez proche de notre Univers";
+			if(sim > 0.75) txt = "très proche de notre Univers";
+			if(sim > 0.94) txt = "très similaire à notre Univers";
+			if(sim == 1) txt = "comme notre Univers !";
+			$('#similarity').html('Similarité <span class="similarity property">'+Math.round(sim*100)+' %</span> - '+txt+'');
+		}
 
 		$('span.omega_b').html(' = '+this.omega_b.value);
 		$('span.omega_c').html(' = '+this.omega_c.value);
 		$('span.omega_l').html(' = '+this.omega_l.value);
 
+
 		return this;
 	}
 
+	// Calculate the similarity of the chosen universe to our universe
+	Simulator.prototype.similarity = function(p,ref,w){
+		var s = 0;
+		var v;
+		if(!w) w = new Array(p.length);
+		for(var i = 0, j = 0; i < p.length ; i++){
+			if(p[i] < 0.01) p[i] = 0.01;	// Fudge to stop us zapping the similarity score when p[i] == 0.0
+			if(!w[i]) w[i] = 1;
+			v = Math.pow( ( 1 - Math.abs( (p[i] - ref[i]) / (p[i] + ref[i]) ) ), w[i]/p.length);
+			if(j==0) s = v;
+			else s *= v;
+			j++;
+		}
+		return s;
+	}
 
 	// Inspired by Ned Wright's Cosmology Calculator
 	// http://www.astro.ucla.edu/~wright/CosmoCalc.html
