@@ -1365,6 +1365,8 @@
 		// A place to cache the previous Omega values
 		this.previous = { omega_b: -1, omega_c: -1, omega_l: -1 };
 		this.exhibition = true;
+		// VP
+		this.powerspectrum = false; // Set to true if we want the power spectrum graph to be displayed
 		this.fs = parseInt($('body').css('font-size'));
 
 		if(this.exhibition && $('body').width() > 1200){
@@ -1491,7 +1493,11 @@
 		);
 
 		// Set up the configuration form
-		$('#config form').append('<!--<div class="configoption"><input type="checkbox" name="showscale" /><label for="showscale">Montrer les échelles angulaires</label></a></div><div class="configoption"><input type="checkbox" name="showours" /><label for="showours">Montrer notre Univers</label></a></div><div class="configoption">--><div class="configoption"><input type="checkbox" name="normscale" /><label for="normscale">Normaliser l\'échelle du graphe</label></div><input type="checkbox" name="buttonouruniverse" /><label for="buttonouruniverse">Bouton \"Notre Univers\"</label></div><!--<div class="configoption"><label for="colourtable">Code de couleur</label>: <select name="colourtable" id="colourtable"><option value="planck">Planck</option><option value="blackbody">Heat</option><option value="A">A</option><option value="B">B</option></select></div>-->');
+		if (this.powerspectrum) {
+			$('#config form').append('<!--<div class="configoption"><input type="checkbox" name="showscale" /><label for="showscale">Montrer les échelles angulaires</label></a></div><div class="configoption"><input type="checkbox" name="showours" /><label for="showours">Montrer notre Univers</label></a></div><div class="configoption">--><div class="configoption"><input type="checkbox" name="normscale" /><label for="normscale">Normaliser l\'échelle du graphe</label></div><input type="checkbox" name="buttonouruniverse" /><label for="buttonouruniverse">Bouton \"Notre Univers\"</label></div><!--<div class="configoption"><label for="colourtable">Code de couleur</label>: <select name="colourtable" id="colourtable"><option value="planck">Planck</option><option value="blackbody">Heat</option><option value="A">A</option><option value="B">B</option></select></div>-->');
+		} else {
+			$('#config form').append('<!--<div class="configoption"><input type="checkbox" name="showscale" /><label for="showscale">Montrer les échelles angulaires</label></a></div><div class="configoption"><input type="checkbox" name="showours" /><label for="showours">Montrer notre Univers</label></a></div><div class="configoption">--><input type="checkbox" name="buttonouruniverse" /><label for="buttonouruniverse">Bouton \"Notre Univers\"</label></div><!--<div class="configoption"><label for="colourtable">Code de couleur</label>: <select name="colourtable" id="colourtable"><option value="planck">Planck</option><option value="blackbody">Heat</option><option value="A">A</option><option value="B">B</option></select></div>-->');
+		}
 		$('#config form input[name=showscale]').attr('checked',this.sky.showscale).on('click',{me:this},function(e){
 			var sim = e.data.me;
 			sim.sky.showscale = $(this).is(':checked');
@@ -1574,7 +1580,11 @@
 			if(location.hash.substring(1)!="about" && $('#help').hasClass('on')) toggleAbout();
 		},500);
 
-		var newdiv = $('<div id="menu"><div id="help" class="toggle"><a href="#about" class="abouton">i</a><a href="#" class="aboutoff">&#8679;</a></div><div id="advancedtoggle" class="toggle"><a href="#powerspectrum"><img src="media/img/cleardot.gif" alt="Plot" title="Montrer le graphe" /></a></div><div id="configtoggle" class="toggle"><a href="#config"><img src="media/img/cleardot.gif" alt="Options" title="Montrer les options" /></a></div><div id="refreshtoggle" class="toggle"><a href="#"><img src="media/img/cleardot.gif" alt="Plot" title="Rafraîchir la page" /></a></div></div>');
+		if (this.powerspectrum){
+			var newdiv = $('<div id="menu"><div id="help" class="toggle"><a href="#about" class="abouton">i</a><a href="#" class="aboutoff">&#8679;</a></div><div id="advancedtoggle" class="toggle"><a href="#powerspectrum"><img src="media/img/cleardot.gif" alt="Plot" title="Montrer le graphe" /></a></div><div id="configtoggle" class="toggle"><a href="#config"><img src="media/img/cleardot.gif" alt="Options" title="Montrer les options" /></a></div><div id="refreshtoggle" class="toggle"><a href="#"><img src="media/img/cleardot.gif" alt="Plot" title="Rafraîchir la page" /></a></div></div>');
+		} else {
+			var newdiv = $('<div id="menu"><div id="help" class="toggle"><a href="#about" class="abouton">i</a><a href="#" class="aboutoff">&#8679;</a></div><div id="configtoggle" class="toggle"><a href="#config"><img src="media/img/cleardot.gif" alt="Options" title="Montrer les options" /></a></div><div id="refreshtoggle" class="toggle"><a href="#"><img src="media/img/cleardot.gif" alt="Plot" title="Rafraîchir la page" /></a></div></div>');
+		}
 		$('h1').before(newdiv);
 		$('#help .abouton a, #help .aboutoff a').on('click',toggleAbout);
 		$('#advancedtoggle a').on('click',{me:this},function(e){
